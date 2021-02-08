@@ -13,7 +13,7 @@ export default function Home() {
           Welcome to the Stakehouse port checker
         </h1>
         <p className={styles.description}>
-          See /api/checker or /api/checker?ports=9000,12000,13000
+          See <a href="/api/checker">/api/checker</a> or <a href="/api/checker?ports=9000,12000,13000">/api/checker?ports=9000,12000,13000</a>
         </p>
       </main>
     </div>

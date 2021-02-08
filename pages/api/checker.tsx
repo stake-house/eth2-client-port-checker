@@ -1,4 +1,6 @@
-const NetcatClient = require('netcat/client')
+import { NextApiRequest, NextApiResponse } from "next";
+
+import NetcatClient from 'netcat/client';
 
 const DEFAULT_PORTS = [
   9000, // tcp/udp for teku, nimbus, lighthouse
@@ -7,41 +9,48 @@ const DEFAULT_PORTS = [
   30303, // eth1 (geth, nethermind)
 ];
 
-const parseIp = (req) => {
+const parseIp = (req: NextApiRequest) => {
   return (typeof req.headers['x-forwarded-for'] === 'string'
       && req.headers['x-forwarded-for'].split(',').shift())
     || req.headers['x-real-ip']
-    || req.connection?.remoteAddress
     || req.socket?.remoteAddress
-    || req.connection?.socket?.remoteAddress
     || null;
 }
 
-const getQueryPorts = (query) => {
-  const ports_from_query = query && query.ports ?
-    query.ports
+const processPortsQueryString = (query: string): number[] | null => {
+  return query
       .split(",")    // parse on ,
       .slice(0, 10)  // grab first 10
       .map(Number)   // string -> number
       .filter(number => !isNaN(number))                    // filter NaN
-      .filter(number => (number > 0 && number <= 65535))   // limit valid ports
-    : null;
-
-  return ports_from_query;
+      .filter(number => (number > 0 && number <= 65535));   // limit valid ports
 }
 
-export default async function (req, res) {
+const parseQuery = (ports_query: string | string[]): number[] | null => {
+  if (!ports_query) {
+    return null;
+  }
+
+  if (Array.isArray(ports_query)) {
+    if (ports_query.length > 0) {
+      return processPortsQueryString(ports_query[0]);
+    } else {
+      return null;
+    }
+  }
+
+  return processPortsQueryString(ports_query);
+}
+
+export default async function (req: NextApiRequest, res: NextApiResponse) {
   const client_ip = parseIp(req);
-  // console.log("client ip " + client_ip);
 
-  const query = req ? req.query : null;
-  // console.log(query);
+  const ports_query = req.query?.ports;
+  const ports_requested: number[]|null = parseQuery(ports_query);
 
-  const query_ports = getQueryPorts(query);
-  const ports_to_check = query_ports || DEFAULT_PORTS;
-  // console.log("ports to check: " + ports_to_check);
+  const ports_to_check = ports_requested || DEFAULT_PORTS;
 
-  return new Promise((resolve) => {
+  return new Promise<void>((resolve) => {
     var results = [];
 
     for (const port in ports_to_check) {
@@ -49,7 +58,7 @@ export default async function (req, res) {
         .once('connect', function () {
           results.push(ports_to_check[port])
           nc.close()
-        }).once('err', function (err) {
+        }).once('err', function () {
           nc.close()
         })
     }
